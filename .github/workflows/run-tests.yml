@@ -3,53 +3,41 @@ name: Run Citus Tests
 on:
   push:
     branches:
-      - '**/pgbench/*'       
-      - '**/scale/*'        
-      - '**/tpch/*'           
-      - '**/all_performance_test/*' 
-      - '**/extension/*'      
+      - 'tpch/**'
+      - 'pgbench/**'
 
 jobs:
-  run_tests:
+  run_citus_tests:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout your repo
         uses: actions/checkout@v2
 
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.8' 
+          python-version: '3.8'
 
-      - name: Install dependencies
+      - name: Install Fabric and other dependencies
         run: |
-          pip install -r requirements.txt  # Adjust if using a different package manager
+          python -m pip install --upgrade pip
+          pip install fabric==2.6.0
 
-      - name: Run Citus Test Automation
+      - name: Run TPCH Test
+        if: startsWith(github.ref, 'refs/heads/tpch/')
         run: |
-          # Trigger the corresponding test job based on the branch prefix
-          if [[ "${GITHUB_REF}" == "refs/heads/pgbench/"* ]]; then
-            echo "Running pgbench test..."
-            # Add your command to trigger pgbench test here (e.g., python run_pgbench.py)
-          elif [[ "${GITHUB_REF}" == "refs/heads/scale/"* ]]; then
-            echo "Running scale test..."
-            # Add your command to trigger scale test here (e.g., python run_scale.py)
-          elif [[ "${GITHUB_REF}" == "refs/heads/tpch/"* ]]; then
-            echo "Running tpch test..."
-            # Add your command to trigger tpch test here (e.g., python run_tpch.py)
-          elif [[ "${GITHUB_REF}" == "refs/heads/all_performance_test/"* ]]; then
-            echo "Running all tests..."
-            # Add command to run all tests (e.g., python run_all_tests.py)
-          elif [[ "${GITHUB_REF}" == "refs/heads/extension/"* ]]; then
-            echo "Running extension test..."
-            # Add your command to trigger extension test here (e.g., python run_extension.py)
-          else
-            echo "No matching test prefix found. Exiting."
-            exit 1
-          fi
+          cd test-automation
+          fab run_tpch_tests
 
-      - name: Post results
+      - name: Run PgBench Test
+        if: startsWith(github.ref, 'refs/heads/pgbench/')
         run: |
-          # Code to post test results, e.g., push results to the 'release-test-results' repository.
-          echo "Posting results..."
+          cd test-automation
+          fab run_pgbench_tests
+
+      - name: Upload Test Logs (optional)
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-logs
+          path: test-automation/output_logs/
