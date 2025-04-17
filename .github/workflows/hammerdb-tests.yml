@@ -1,0 +1,64 @@
+name: Run HammerDB Benchmark Tests
+
+on:
+  push:
+    branches:
+      - 'hammerdb/*'  # Adjust to trigger for your specific branch prefix
+
+jobs:
+  hammerdb_benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up SSH for Azure VM
+      run: |
+        eval `ssh-agent -s`
+        ssh-add ~/.ssh/id_rsa  # You need to add your SSH private key as a secret in GitHub
+
+    - name: Set up environment variables
+      run: |
+        echo "RESOURCE_GROUP_NAME=<your_resource_group_name>" >> $GITHUB_ENV
+        echo "GIT_USERNAME=<your_github_username>" >> $GITHUB_ENV
+        echo "GIT_TOKEN=<your_github_token>" >> $GITHUB_ENV
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ssh git python3 python3-pip
+
+    - name: Set up Python environment
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+
+    - name: Install required Python packages
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run HammerDB benchmark
+      run: |
+        # Run the benchmark
+        cd hammerdb
+        # You should modify this to use your custom HammerDB config file
+        vim fabfile/hammerdb_confs/my_custom_config.ini
+        ./create-run.sh
+
+    - name: Upload results as artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: hammerdb-test-results
+        path: |
+          ./hammerdb/test-results/*.log
+          ./hammerdb/test-results/*.txt
+
+    - name: Commit results to a new branch (optional)
+      run: |
+        git config --global user.name "github-actions"
+        git config --global user.email "actions@github.com"
+        git checkout -b "results/hammerdb-$(date +'%Y-%m-%d')"
+        git add ./hammerdb/test-results/
+        git commit -m "Add HammerDB benchmark results"
+        git push origin "results/hammerdb-$(date +'%Y-%m-%d')"
